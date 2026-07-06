@@ -241,35 +241,87 @@
                         const dataSrc = img.getAttribute('data-src');
                         const dataSrcSet = img.getAttribute('data-srcset');
                         const dataLoading = img.getAttribute('data-loading');
-                        
-                        if (dataSrc && (!img.src || img.src === '' || img.src.startsWith('data:'))) {
+                        const dataLazySrc = img.getAttribute('data-lazy-src');
+                        const dataOriginal = img.getAttribute('data-original');
+                        const dataOriginalSrc = img.getAttribute('data-original-src');
+                        const srcset = img.getAttribute('srcset');
+
+                        const srcNeedsFix = !img.src || img.src === '' || img.src.startsWith('data:');
+
+                        if (dataSrc && srcNeedsFix) {
                             img.src = dataSrc;
                             img.removeAttribute('data-src');
                         }
-                        
+
+                        if (dataLazySrc && srcNeedsFix) {
+                            img.src = dataLazySrc;
+                            img.removeAttribute('data-lazy-src');
+                        }
+
+                        if (dataOriginal && srcNeedsFix) {
+                            img.src = dataOriginal;
+                            img.removeAttribute('data-original');
+                        }
+
+                        if (dataOriginalSrc && srcNeedsFix) {
+                            img.src = dataOriginalSrc;
+                            img.removeAttribute('data-original-src');
+                        }
+
                         if (dataSrcSet && !img.srcset) {
                             img.srcset = dataSrcSet;
                             img.removeAttribute('data-srcset');
                         }
-                        
+
+                        if (srcset && srcNeedsFix) {
+                            const firstSrcsetUrl = srcset.trim().split(',')[0].trim().split(/\s+/)[0];
+                            if (firstSrcsetUrl) {
+                                img.src = firstSrcsetUrl;
+                            }
+                        }
+
                         if (dataLoading) {
                             img.removeAttribute('data-loading');
                         }
-                        
+
                         if (img.src && img.src.startsWith('//')) {
                             img.src = 'https:' + img.src;
+                        } else if (img.src && img.src.startsWith('/')) {
+                            img.src = 'https://www.bing.com' + img.src;
                         }
                     });
-                    
-                    clonedItem.querySelectorAll('.cico, .rms_iac').forEach(container => {
+
+                    // 将 Bing 懒加载占位 div 替换为真实的 <img> 元素
+                    // fetch 到的原始 HTML 中，.rms_iac 是带 data-src 的空 div，
+                    // Bing 的客户端 JS 在第 1 页会将其替换为 <img>，但后续页面不会自动执行
+                    clonedItem.querySelectorAll('.rms_iac[data-src]').forEach(rmsDiv => {
+                        const img = document.createElement('img');
+                        img.src = rmsDiv.getAttribute('data-src');
+
+                        const dataHeight = rmsDiv.getAttribute('data-height');
+                        const dataWidth = rmsDiv.getAttribute('data-width');
+                        const dataAlt = rmsDiv.getAttribute('data-alt');
+                        const dataClass = rmsDiv.getAttribute('data-class');
+
+                        if (dataHeight) img.height = dataHeight;
+                        if (dataWidth) img.width = dataWidth;
+                        if (dataAlt) img.alt = dataAlt;
+                        if (dataClass) img.className = dataClass;
+
+                        rmsDiv.parentNode.replaceChild(img, rmsDiv);
+                    });
+
+                    clonedItem.querySelectorAll('.cico, .rms_iac, .b_icon').forEach(container => {
                         const style = container.getAttribute('style') || '';
                         const bgMatch = style.match(/background-image:\s*url\(['"]?([^'")\s]+)['"]?\)/i);
                         if (bgMatch) {
                             let iconUrl = bgMatch[1];
                             if (iconUrl.startsWith('//')) {
                                 iconUrl = 'https:' + iconUrl;
+                            } else if (iconUrl.startsWith('/')) {
+                                iconUrl = 'https://www.bing.com' + iconUrl;
                             }
-                            
+
                             const existingImg = container.querySelector('img');
                             if (existingImg) {
                                 if (!existingImg.src || existingImg.src === '' || existingImg.src.startsWith('data:')) {
@@ -281,8 +333,35 @@
                                 img.style.width = '16px';
                                 img.style.height = '16px';
                                 img.className = 'rms_img';
-                                container.innerHTML = '';
                                 container.appendChild(img);
+                            }
+                        } else {
+                            const existingImg = container.querySelector('img');
+                            if (existingImg && (!existingImg.src || existingImg.src === '' || existingImg.src.startsWith('data:'))) {
+                                const dataSrc = existingImg.getAttribute('data-src');
+                                const dataLazySrc = existingImg.getAttribute('data-lazy-src');
+                                const dataOriginal = existingImg.getAttribute('data-original');
+                                const dataOriginalSrc = existingImg.getAttribute('data-original-src');
+                                const srcset = existingImg.getAttribute('srcset');
+
+                                if (dataSrc) {
+                                    existingImg.src = dataSrc;
+                                    existingImg.removeAttribute('data-src');
+                                } else if (dataLazySrc) {
+                                    existingImg.src = dataLazySrc;
+                                    existingImg.removeAttribute('data-lazy-src');
+                                } else if (dataOriginal) {
+                                    existingImg.src = dataOriginal;
+                                    existingImg.removeAttribute('data-original');
+                                } else if (dataOriginalSrc) {
+                                    existingImg.src = dataOriginalSrc;
+                                    existingImg.removeAttribute('data-original-src');
+                                } else if (srcset) {
+                                    const firstUrl = srcset.trim().split(',')[0].trim().split(/\s+/)[0];
+                                    if (firstUrl) {
+                                        existingImg.src = firstUrl;
+                                    }
+                                }
                             }
                         }
                     });
@@ -294,6 +373,8 @@
                             let iconUrl = bgMatch[1];
                             if (iconUrl.startsWith('//')) {
                                 iconUrl = 'https:' + iconUrl;
+                            } else if (iconUrl.startsWith('/')) {
+                                iconUrl = 'https://www.bing.com' + iconUrl;
                             }
                             el.style.backgroundImage = `url('${iconUrl}')`;
                         }
@@ -310,7 +391,7 @@
                 separator.className = 'auto-expand-separator bing-separator';
                 separator.innerHTML = `
                     <div class="separator-line"></div>
-                    <span class="separator-text">Page ${pageNum}</span>
+                    <span class="separator-text">第 ${pageNum} 页</span>
                     <div class="separator-line"></div>
                 `;
                 return separator;
